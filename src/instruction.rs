@@ -1,6 +1,7 @@
 use crate::machine::Register;
 
 /// Represents all the possible instructions that can be encoded in the Chip-8 architecture.
+#[derive(Debug)]
 enum Instruction {
     /// Jump to a machine code routine at the specified address. This instruction was only
     /// implemented on the original Chip-8 interpreter and is ignored in modern interpreters.
@@ -54,7 +55,7 @@ enum Instruction {
     /// Set the value of the address register to the specified address.
     LdAddr { addr: u16 },
     /// Jump to the specified location added to the value specified in V0.
-    JpOff { base_addr: u16 },
+    JmpOff { base_addr: u16 },
     /// Fetches a random number, performs a bitwise AND with the mask, and stores the result in the
     /// register.
     Rnd { register: Register, mask: u8 },
@@ -88,4 +89,130 @@ enum Instruction {
     /// Loads the value of registers V0 through the specified register from the location specified
     /// by the address register.
     LdArray { end: Register },
+}
+
+/// Decodes a 16-bit encoded instruction into the decoded format.
+fn decode(instr: u16) -> Instruction {
+    match instr & 0xF000 {
+        0x0000 => {
+            match instr {
+                0x00E0 => Instruction::Clr,
+                0x00EE => Instruction::Ret,
+                _ => {
+                    let addr = instr & 0x0FFF;
+                    Instruction::Sys { addr }
+                }
+            }
+        }
+        0x1000 => {
+            let addr = instr & 0x0FFF;
+            Instruction::Jmp { addr }
+        }
+        0x2000 => {
+            let addr = instr & 0x0FFF;
+            Instruction::Call { addr }
+        }
+        0x3000 => {
+            let register = (instr & 0x0F00) as Register;
+            let byte = instr as u8;
+            Instruction::SeImm { register, value: byte }
+        }
+        0x4000 => {
+            let register = (instr & 0x0F00) as Register;
+            let byte = instr as u8;
+            Instruction::SneImm { register, value: byte }
+        }
+        0x5000 => {
+            match instr & 0x000F {
+                0 => {
+                    let reg1 = (instr & 0x0F00) as Register;
+                    let reg2 = (instr & 0x00F0) as Register;
+                    Instruction::SeReg { reg1, reg2 }
+                }
+                _ => unimplemented!()
+            }
+        }
+        0x6000 => {
+            let register = (instr & 0x0F00) as Register;
+            let byte = instr as u8;
+            Instruction::LdImm { register, value: byte }
+        }
+        0x7000 => {
+            let register = (instr & 0x0F00) as Register;
+            let byte = instr as u8;
+            Instruction::AddImm { register, value: byte }
+        }
+        0x8000 => {
+            let dest = (instr & 0x0F00) as Register;
+            let src = (instr & 0x00F0) as Register;
+
+            match instr & 0x000F {
+                0x0 => Instruction::LdReg { dest, src },
+                0x1 => Instruction::Or { dest, src },
+                0x2 => Instruction::And { dest, src },
+                0x3 => Instruction::Xor { dest, src },
+                0x4 => Instruction::AddReg { dest, src },
+                0x5 => Instruction::Sub { dest, src },
+                0x6 => Instruction::Shr { dest, src },
+                0x7 => Instruction::SubNeg { dest, src },
+                0xE => Instruction::Shl { dest, src },
+                _ => unimplemented!()
+            }
+        }
+        0x9000 => {
+            match instr & 0x000F {
+                0 => {
+                    let reg1 = (instr & 0x0F00) as Register;
+                    let reg2 = (instr & 0x00F0) as Register;
+                    Instruction::SneReg { reg1, reg2 }
+                }
+                _ => unimplemented!()
+            }
+        }
+        0xA000 => {
+            let addr = instr & 0x0FFF;
+            Instruction::LdAddr { addr }
+        }
+        0xB000 => {
+            let addr = instr & 0x0FFF;
+            Instruction::JmpOff { base_addr: addr }
+        }
+        0xC000 => {
+            let register = (instr & 0x0F00) as Register;
+            let byte = instr as u8;
+            Instruction::Rnd { register, mask: byte }
+        }
+        0xD000 => {
+            let reg_x = (instr & 0x0F00) as Register;
+            let reg_y = (instr & 0x00F0) as Register;
+            let length = (instr & 0x000F) as u8;
+            Instruction::Drw { x: reg_x, y: reg_y, length }
+        }
+        0xE000 => {
+            let register = (instr & 0x0F00) as Register;
+
+            match instr & 0x00FF {
+                0x009E => Instruction::Skp { keycode: register },
+                0x00A1 => Instruction::SkpNeg { keycode: register },
+                _ => unimplemented!()
+            }
+        }
+        0xF000 => {
+            let register = (instr & 0x0F00) as Register;
+
+            match instr & 0x00FF {
+                0x0007 => Instruction::ReadDelay { register },
+                0x000A => Instruction::LdKey { register },
+                0x0015 => Instruction::StrDelay { register },
+                0x0018 => Instruction::StrSound { register },
+                0x001E => Instruction::AddAddr { register },
+                0x0029 => Instruction::LdDigit { register },
+                0x0033 => Instruction::LdBcd { register },
+                0x0055 => Instruction::StrArray { end: register },
+                0x0065 => Instruction::LdArray { end: register },
+                _ => unimplemented!()
+            }
+        }
+        _ => unimplemented!()
+    }
 }

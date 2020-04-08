@@ -1,5 +1,6 @@
 /// Represents all the registers directly available to programs in the Chip-8 architecture. Each
 /// stores a byte of information.
+#[derive(Debug)]
 pub enum Register {
     V0,
     V1,

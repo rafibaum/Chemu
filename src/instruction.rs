@@ -100,16 +100,32 @@ pub enum Instruction {
     LdArray { end: Register },
 }
 
+/// Error that occurs while decoding an instruction.
 #[derive(Debug)]
 pub struct DecodeInstructionError {
+    /// The encoded instruction that was being decoded when the error occurred.
     instr: u16,
     error_kind: DecodeErrorKind,
 }
 
 #[derive(Debug)]
 enum DecodeErrorKind {
+    /// The encoded instruction has an instruction which chemu doesn't know how to handle.
     IllegalOpCode,
+    /// The instruction contains a register argument that references a non-existent register.
     RegisterDecodeError { register_error: RegisterParseError },
+}
+
+impl DecodeInstructionError {
+    fn from_register_decode(
+        instr: u16,
+        register_error: RegisterParseError,
+    ) -> DecodeInstructionError {
+        DecodeInstructionError {
+            instr,
+            error_kind: DecodeErrorKind::RegisterDecodeError { register_error },
+        }
+    }
 }
 
 impl Display for DecodeInstructionError {
@@ -125,6 +141,7 @@ impl Error for DecodeInstructionError {}
 
 /// Decodes a 16-bit encoded instruction into the decoded format.
 pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
+    // Most CHIP-8 instructions only differ by the first digit so we'll match on it in the first instance.
     match instr & 0xF000 {
         0x0000 => match instr {
             0x00E0 => Ok(Instruction::Clr),
@@ -143,15 +160,9 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
             Ok(Instruction::Call { addr })
         }
         0x3000 => {
-            let register =
-                ((instr & 0x0F00) >> 8)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+            let register = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
             let byte = instr as u8;
             Ok(Instruction::SeImm {
                 register,
@@ -159,58 +170,34 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
             })
         }
         0x4000 => {
-            let register =
-                ((instr & 0x0F00) >> 8)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+            let register = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
             let byte = instr as u8;
             Ok(Instruction::SneImm {
                 register,
                 value: byte,
             })
         }
-        0x5000 => {
-            match instr & 0x000F {
-                0 => {
-                    let reg1 = ((instr & 0x0F00) >> 8).try_into().map_err(|error| {
-                        DecodeInstructionError {
-                            instr,
-                            error_kind: DecodeErrorKind::RegisterDecodeError {
-                                register_error: error,
-                            },
-                        }
-                    })?;
-                    let reg2 = ((instr & 0x00F0) >> 4).try_into().map_err(|error| {
-                        DecodeInstructionError {
-                            instr,
-                            error_kind: DecodeErrorKind::RegisterDecodeError {
-                                register_error: error,
-                            },
-                        }
-                    })?;
-                    Ok(Instruction::SeReg { reg1, reg2 })
-                }
-                _ => Err(DecodeInstructionError {
-                    instr,
-                    error_kind: DecodeErrorKind::IllegalOpCode,
-                }),
-            }
-        }
-        0x6000 => {
-            let register =
-                ((instr & 0x0F00) >> 8)
+        0x5000 => match instr & 0x000F {
+            0 => {
+                let reg1 = ((instr & 0x0F00) >> 8)
                     .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+                    .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
+                let reg2 = ((instr & 0x00F0) >> 4)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
+                Ok(Instruction::SeReg { reg1, reg2 })
+            }
+            _ => Err(DecodeInstructionError {
+                instr,
+                error_kind: DecodeErrorKind::IllegalOpCode,
+            }),
+        },
+        0x6000 => {
+            let register = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
             let byte = instr as u8;
             Ok(Instruction::LdImm {
                 register,
@@ -218,15 +205,9 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
             })
         }
         0x7000 => {
-            let register =
-                ((instr & 0x0F00) >> 8)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+            let register = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
             let byte = instr as u8;
             Ok(Instruction::AddImm {
                 register,
@@ -234,24 +215,12 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
             })
         }
         0x8000 => {
-            let dest =
-                ((instr & 0x0F00) >> 8)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
-            let src =
-                ((instr & 0x00F0) >> 4)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+            let dest = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
+            let src = ((instr & 0x00F0) >> 4)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
 
             match instr & 0x000F {
                 0x0 => Ok(Instruction::LdReg { dest, src }),
@@ -269,33 +238,21 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
                 }),
             }
         }
-        0x9000 => {
-            match instr & 0x000F {
-                0 => {
-                    let reg1 = ((instr & 0x0F00) >> 8).try_into().map_err(|error| {
-                        DecodeInstructionError {
-                            instr,
-                            error_kind: DecodeErrorKind::RegisterDecodeError {
-                                register_error: error,
-                            },
-                        }
-                    })?;
-                    let reg2 = ((instr & 0x00F0) >> 4).try_into().map_err(|error| {
-                        DecodeInstructionError {
-                            instr,
-                            error_kind: DecodeErrorKind::RegisterDecodeError {
-                                register_error: error,
-                            },
-                        }
-                    })?;
-                    Ok(Instruction::SneReg { reg1, reg2 })
-                }
-                _ => Err(DecodeInstructionError {
-                    instr,
-                    error_kind: DecodeErrorKind::IllegalOpCode,
-                }),
+        0x9000 => match instr & 0x000F {
+            0 => {
+                let reg1 = ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
+                let reg2 = ((instr & 0x00F0) >> 4)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
+                Ok(Instruction::SneReg { reg1, reg2 })
             }
-        }
+            _ => Err(DecodeInstructionError {
+                instr,
+                error_kind: DecodeErrorKind::IllegalOpCode,
+            }),
+        },
         0xA000 => {
             let addr = instr & 0x0FFF;
             Ok(Instruction::LdAddr { addr })
@@ -305,15 +262,9 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
             Ok(Instruction::JmpOff { base_addr: addr })
         }
         0xC000 => {
-            let register =
-                ((instr & 0x0F00) >> 8)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+            let register = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
             let byte = instr as u8;
             Ok(Instruction::Rnd {
                 register,
@@ -321,24 +272,12 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
             })
         }
         0xD000 => {
-            let reg_x =
-                ((instr & 0x0F00) >> 8)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
-            let reg_y =
-                ((instr & 0x00F0) >> 4)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+            let reg_x = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
+            let reg_y = ((instr & 0x00F0) >> 4)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
             let length = (instr & 0x000F) as u8;
             Ok(Instruction::Drw {
                 x: reg_x,
@@ -347,15 +286,9 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
             })
         }
         0xE000 => {
-            let register =
-                ((instr & 0x0F00) >> 8)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+            let register = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
 
             match instr & 0x00FF {
                 0x009E => Ok(Instruction::Skp { keycode: register }),
@@ -367,15 +300,9 @@ pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
             }
         }
         0xF000 => {
-            let register =
-                ((instr & 0x0F00) >> 8)
-                    .try_into()
-                    .map_err(|error| DecodeInstructionError {
-                        instr,
-                        error_kind: DecodeErrorKind::RegisterDecodeError {
-                            register_error: error,
-                        },
-                    })?;
+            let register = ((instr & 0x0F00) >> 8)
+                .try_into()
+                .map_err(|error| DecodeInstructionError::from_register_decode(instr, error))?;
 
             match instr & 0x00FF {
                 0x0007 => Ok(Instruction::ReadDelay { register }),

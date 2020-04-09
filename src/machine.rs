@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 /// Represents all the registers directly available to programs in the Chip-8 architecture. Each
 /// stores a byte of information.
@@ -28,20 +28,20 @@ pub enum Register {
 }
 
 #[derive(Debug)]
-pub struct NoRegisterError {
-    value: u16
+pub struct RegisterParseError {
+    value: u16,
 }
 
-impl Error for NoRegisterError {}
+impl Error for RegisterParseError {}
 
-impl Display for NoRegisterError {
+impl Display for RegisterParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "No register found for value: {}", self.value)
+        write!(f, "no register found for value: {:X}", self.value)
     }
 }
 
 impl TryFrom<u16> for Register {
-    type Error = NoRegisterError;
+    type Error = RegisterParseError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
@@ -61,7 +61,7 @@ impl TryFrom<u16> for Register {
             13 => Ok(Register::VD),
             14 => Ok(Register::VE),
             15 => Ok(Register::VF),
-            _ => Err(NoRegisterError { value })
+            _ => Err(RegisterParseError { value }),
         }
     }
 }

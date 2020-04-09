@@ -1,5 +1,9 @@
-use crate::machine::Register;
+use crate::instruction::DecodeErrorKind::IllegalOpCode;
+use crate::machine::{Register, RegisterParseError};
 use std::convert::TryInto;
+use std::error::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 /// Represents all the possible instructions that can be encoded in the Chip-8 architecture.
 #[derive(Debug)]
@@ -62,7 +66,11 @@ pub enum Instruction {
     Rnd { register: Register, mask: u8 },
     /// Draws the sprite stored at the location in the address register of the specified length to
     /// the location specified by the two register values.
-    Drw { x: Register, y: Register, length: u8 },
+    Drw {
+        x: Register,
+        y: Register,
+        length: u8,
+    },
     /// Skip the next instruction if the key with the value in the register is pressed.
     Skp { keycode: Register },
     /// Skip the next instruction if the key with the value in the register is not pressed.
@@ -92,128 +100,302 @@ pub enum Instruction {
     LdArray { end: Register },
 }
 
-/// Decodes a 16-bit encoded instruction into the decoded format.
-pub fn decode(instr: u16) -> Instruction {
-    match instr & 0xF000 {
-        0x0000 => {
-            match instr {
-                0x00E0 => Instruction::Clr,
-                0x00EE => Instruction::Ret,
-                _ => {
-                    let addr = instr & 0x0FFF;
-                    Instruction::Sys { addr }
-                }
-            }
+#[derive(Debug)]
+pub struct DecodeInstructionError {
+    instr: u16,
+    error_kind: DecodeErrorKind,
+}
+
+#[derive(Debug)]
+enum DecodeErrorKind {
+    IllegalOpCode,
+    RegisterDecodeError { register_error: RegisterParseError },
+}
+
+impl Display for DecodeInstructionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match &self.error_kind {
+            DecodeErrorKind::RegisterDecodeError { register_error } => register_error.fmt(f),
+            IllegalOpCode => write!(f, "illegal opcode: {:X}", self.instr),
         }
+    }
+}
+
+impl Error for DecodeInstructionError {}
+
+/// Decodes a 16-bit encoded instruction into the decoded format.
+pub fn decode(instr: u16) -> Result<Instruction, DecodeInstructionError> {
+    match instr & 0xF000 {
+        0x0000 => match instr {
+            0x00E0 => Ok(Instruction::Clr),
+            0x00EE => Ok(Instruction::Ret),
+            _ => {
+                let addr = instr & 0x0FFF;
+                Ok(Instruction::Sys { addr })
+            }
+        },
         0x1000 => {
             let addr = instr & 0x0FFF;
-            Instruction::Jmp { addr }
+            Ok(Instruction::Jmp { addr })
         }
         0x2000 => {
             let addr = instr & 0x0FFF;
-            Instruction::Call { addr }
+            Ok(Instruction::Call { addr })
         }
         0x3000 => {
-            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let register =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
             let byte = instr as u8;
-            Instruction::SeImm { register, value: byte }
+            Ok(Instruction::SeImm {
+                register,
+                value: byte,
+            })
         }
         0x4000 => {
-            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let register =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
             let byte = instr as u8;
-            Instruction::SneImm { register, value: byte }
+            Ok(Instruction::SneImm {
+                register,
+                value: byte,
+            })
         }
         0x5000 => {
             match instr & 0x000F {
                 0 => {
-                    let reg1 = ((instr & 0x0F00) >> 8).try_into().unwrap();
-                    let reg2 = ((instr & 0x00F0) >> 4).try_into().unwrap();
-                    Instruction::SeReg { reg1, reg2 }
+                    let reg1 = ((instr & 0x0F00) >> 8).try_into().map_err(|error| {
+                        DecodeInstructionError {
+                            instr,
+                            error_kind: DecodeErrorKind::RegisterDecodeError {
+                                register_error: error,
+                            },
+                        }
+                    })?;
+                    let reg2 = ((instr & 0x00F0) >> 4).try_into().map_err(|error| {
+                        DecodeInstructionError {
+                            instr,
+                            error_kind: DecodeErrorKind::RegisterDecodeError {
+                                register_error: error,
+                            },
+                        }
+                    })?;
+                    Ok(Instruction::SeReg { reg1, reg2 })
                 }
-                _ => unimplemented!()
+                _ => Err(DecodeInstructionError {
+                    instr,
+                    error_kind: DecodeErrorKind::IllegalOpCode,
+                }),
             }
         }
         0x6000 => {
-            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let register =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
             let byte = instr as u8;
-            Instruction::LdImm { register, value: byte }
+            Ok(Instruction::LdImm {
+                register,
+                value: byte,
+            })
         }
         0x7000 => {
-            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let register =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
             let byte = instr as u8;
-            Instruction::AddImm { register, value: byte }
+            Ok(Instruction::AddImm {
+                register,
+                value: byte,
+            })
         }
         0x8000 => {
-            let dest = ((instr & 0x0F00) >> 8).try_into().unwrap();
-            let src = ((instr & 0x00F0) >> 4).try_into().unwrap();
+            let dest =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
+            let src =
+                ((instr & 0x00F0) >> 4)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
 
             match instr & 0x000F {
-                0x0 => Instruction::LdReg { dest, src },
-                0x1 => Instruction::Or { dest, src },
-                0x2 => Instruction::And { dest, src },
-                0x3 => Instruction::Xor { dest, src },
-                0x4 => Instruction::AddReg { dest, src },
-                0x5 => Instruction::Sub { dest, src },
-                0x6 => Instruction::Shr { dest, src },
-                0x7 => Instruction::SubNeg { dest, src },
-                0xE => Instruction::Shl { dest, src },
-                _ => unimplemented!()
+                0x0 => Ok(Instruction::LdReg { dest, src }),
+                0x1 => Ok(Instruction::Or { dest, src }),
+                0x2 => Ok(Instruction::And { dest, src }),
+                0x3 => Ok(Instruction::Xor { dest, src }),
+                0x4 => Ok(Instruction::AddReg { dest, src }),
+                0x5 => Ok(Instruction::Sub { dest, src }),
+                0x6 => Ok(Instruction::Shr { dest, src }),
+                0x7 => Ok(Instruction::SubNeg { dest, src }),
+                0xE => Ok(Instruction::Shl { dest, src }),
+                _ => Err(DecodeInstructionError {
+                    instr,
+                    error_kind: DecodeErrorKind::IllegalOpCode,
+                }),
             }
         }
         0x9000 => {
             match instr & 0x000F {
                 0 => {
-                    let reg1 = ((instr & 0x0F00) >> 8).try_into().unwrap();
-                    let reg2 = ((instr & 0x00F0) >> 4).try_into().unwrap();
-                    Instruction::SneReg { reg1, reg2 }
+                    let reg1 = ((instr & 0x0F00) >> 8).try_into().map_err(|error| {
+                        DecodeInstructionError {
+                            instr,
+                            error_kind: DecodeErrorKind::RegisterDecodeError {
+                                register_error: error,
+                            },
+                        }
+                    })?;
+                    let reg2 = ((instr & 0x00F0) >> 4).try_into().map_err(|error| {
+                        DecodeInstructionError {
+                            instr,
+                            error_kind: DecodeErrorKind::RegisterDecodeError {
+                                register_error: error,
+                            },
+                        }
+                    })?;
+                    Ok(Instruction::SneReg { reg1, reg2 })
                 }
-                _ => unimplemented!()
+                _ => Err(DecodeInstructionError {
+                    instr,
+                    error_kind: DecodeErrorKind::IllegalOpCode,
+                }),
             }
         }
         0xA000 => {
             let addr = instr & 0x0FFF;
-            Instruction::LdAddr { addr }
+            Ok(Instruction::LdAddr { addr })
         }
         0xB000 => {
             let addr = instr & 0x0FFF;
-            Instruction::JmpOff { base_addr: addr }
+            Ok(Instruction::JmpOff { base_addr: addr })
         }
         0xC000 => {
-            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let register =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
             let byte = instr as u8;
-            Instruction::Rnd { register, mask: byte }
+            Ok(Instruction::Rnd {
+                register,
+                mask: byte,
+            })
         }
         0xD000 => {
-            let reg_x = ((instr & 0x0F00) >> 8).try_into().unwrap();
-            let reg_y = ((instr & 0x00F0) >> 4).try_into().unwrap();
+            let reg_x =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
+            let reg_y =
+                ((instr & 0x00F0) >> 4)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
             let length = (instr & 0x000F) as u8;
-            Instruction::Drw { x: reg_x, y: reg_y, length }
+            Ok(Instruction::Drw {
+                x: reg_x,
+                y: reg_y,
+                length,
+            })
         }
         0xE000 => {
-            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let register =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
 
             match instr & 0x00FF {
-                0x009E => Instruction::Skp { keycode: register },
-                0x00A1 => Instruction::SkpNeg { keycode: register },
-                _ => panic!("Unimplemented skip {:X?}", instr)
+                0x009E => Ok(Instruction::Skp { keycode: register }),
+                0x00A1 => Ok(Instruction::SkpNeg { keycode: register }),
+                _ => Err(DecodeInstructionError {
+                    instr,
+                    error_kind: DecodeErrorKind::IllegalOpCode,
+                }),
             }
         }
         0xF000 => {
-            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let register =
+                ((instr & 0x0F00) >> 8)
+                    .try_into()
+                    .map_err(|error| DecodeInstructionError {
+                        instr,
+                        error_kind: DecodeErrorKind::RegisterDecodeError {
+                            register_error: error,
+                        },
+                    })?;
 
             match instr & 0x00FF {
-                0x0007 => Instruction::ReadDelay { register },
-                0x000A => Instruction::LdKey { register },
-                0x0015 => Instruction::StrDelay { register },
-                0x0018 => Instruction::StrSound { register },
-                0x001E => Instruction::AddAddr { register },
-                0x0029 => Instruction::LdDigit { register },
-                0x0033 => Instruction::LdBcd { register },
-                0x0055 => Instruction::StrArray { end: register },
-                0x0065 => Instruction::LdArray { end: register },
-                _ => unimplemented!()
+                0x0007 => Ok(Instruction::ReadDelay { register }),
+                0x000A => Ok(Instruction::LdKey { register }),
+                0x0015 => Ok(Instruction::StrDelay { register }),
+                0x0018 => Ok(Instruction::StrSound { register }),
+                0x001E => Ok(Instruction::AddAddr { register }),
+                0x0029 => Ok(Instruction::LdDigit { register }),
+                0x0033 => Ok(Instruction::LdBcd { register }),
+                0x0055 => Ok(Instruction::StrArray { end: register }),
+                0x0065 => Ok(Instruction::LdArray { end: register }),
+                _ => Err(DecodeInstructionError {
+                    instr,
+                    error_kind: DecodeErrorKind::IllegalOpCode,
+                }),
             }
         }
-        _ => unimplemented!()
+        _ => Err(DecodeInstructionError {
+            instr,
+            error_kind: DecodeErrorKind::IllegalOpCode,
+        }),
     }
 }

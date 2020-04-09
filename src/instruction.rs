@@ -1,8 +1,9 @@
 use crate::machine::Register;
+use std::convert::TryInto;
 
 /// Represents all the possible instructions that can be encoded in the Chip-8 architecture.
 #[derive(Debug)]
-enum Instruction {
+pub enum Instruction {
     /// Jump to a machine code routine at the specified address. This instruction was only
     /// implemented on the original Chip-8 interpreter and is ignored in modern interpreters.
     Sys { addr: u16 },
@@ -92,7 +93,7 @@ enum Instruction {
 }
 
 /// Decodes a 16-bit encoded instruction into the decoded format.
-fn decode(instr: u16) -> Instruction {
+pub fn decode(instr: u16) -> Instruction {
     match instr & 0xF000 {
         0x0000 => {
             match instr {
@@ -113,38 +114,38 @@ fn decode(instr: u16) -> Instruction {
             Instruction::Call { addr }
         }
         0x3000 => {
-            let register = (instr & 0x0F00) as Register;
+            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
             let byte = instr as u8;
             Instruction::SeImm { register, value: byte }
         }
         0x4000 => {
-            let register = (instr & 0x0F00) as Register;
+            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
             let byte = instr as u8;
             Instruction::SneImm { register, value: byte }
         }
         0x5000 => {
             match instr & 0x000F {
                 0 => {
-                    let reg1 = (instr & 0x0F00) as Register;
-                    let reg2 = (instr & 0x00F0) as Register;
+                    let reg1 = ((instr & 0x0F00) >> 8).try_into().unwrap();
+                    let reg2 = ((instr & 0x00F0) >> 4).try_into().unwrap();
                     Instruction::SeReg { reg1, reg2 }
                 }
                 _ => unimplemented!()
             }
         }
         0x6000 => {
-            let register = (instr & 0x0F00) as Register;
+            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
             let byte = instr as u8;
             Instruction::LdImm { register, value: byte }
         }
         0x7000 => {
-            let register = (instr & 0x0F00) as Register;
+            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
             let byte = instr as u8;
             Instruction::AddImm { register, value: byte }
         }
         0x8000 => {
-            let dest = (instr & 0x0F00) as Register;
-            let src = (instr & 0x00F0) as Register;
+            let dest = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let src = ((instr & 0x00F0) >> 4).try_into().unwrap();
 
             match instr & 0x000F {
                 0x0 => Instruction::LdReg { dest, src },
@@ -162,8 +163,8 @@ fn decode(instr: u16) -> Instruction {
         0x9000 => {
             match instr & 0x000F {
                 0 => {
-                    let reg1 = (instr & 0x0F00) as Register;
-                    let reg2 = (instr & 0x00F0) as Register;
+                    let reg1 = ((instr & 0x0F00) >> 8).try_into().unwrap();
+                    let reg2 = ((instr & 0x00F0) >> 4).try_into().unwrap();
                     Instruction::SneReg { reg1, reg2 }
                 }
                 _ => unimplemented!()
@@ -178,27 +179,27 @@ fn decode(instr: u16) -> Instruction {
             Instruction::JmpOff { base_addr: addr }
         }
         0xC000 => {
-            let register = (instr & 0x0F00) as Register;
+            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
             let byte = instr as u8;
             Instruction::Rnd { register, mask: byte }
         }
         0xD000 => {
-            let reg_x = (instr & 0x0F00) as Register;
-            let reg_y = (instr & 0x00F0) as Register;
+            let reg_x = ((instr & 0x0F00) >> 8).try_into().unwrap();
+            let reg_y = ((instr & 0x00F0) >> 4).try_into().unwrap();
             let length = (instr & 0x000F) as u8;
             Instruction::Drw { x: reg_x, y: reg_y, length }
         }
         0xE000 => {
-            let register = (instr & 0x0F00) as Register;
+            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
 
             match instr & 0x00FF {
                 0x009E => Instruction::Skp { keycode: register },
                 0x00A1 => Instruction::SkpNeg { keycode: register },
-                _ => unimplemented!()
+                _ => panic!("Unimplemented skip {:X?}", instr)
             }
         }
         0xF000 => {
-            let register = (instr & 0x0F00) as Register;
+            let register = ((instr & 0x0F00) >> 8).try_into().unwrap();
 
             match instr & 0x00FF {
                 0x0007 => Instruction::ReadDelay { register },

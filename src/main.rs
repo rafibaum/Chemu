@@ -11,7 +11,7 @@ fn main() {
     let file_path = match args.next() {
         Some(path) => path,
         None => {
-            println!("No CHIP-8 program passed in");
+            eprintln!("No CHIP-8 program passed in");
             return;
         }
     };
@@ -19,8 +19,8 @@ fn main() {
     let file = match File::open(file_path) {
         Ok(file) => file,
         Err(e) => {
-            println!("Could not open file");
-            println!("Cause: {}", e);
+            eprintln!("Could not open file");
+            eprintln!("Cause: {}", e);
             return;
         }
     };
@@ -37,8 +37,8 @@ fn main() {
             if e.kind() == std::io::ErrorKind::UnexpectedEof {
                 break 'reading;
             } else {
-                println!("An IO error has occurred");
-                println!("Cause: {}", e);
+                eprintln!("An IO error has occurred");
+                eprintln!("Cause: {}", e);
                 return;
             }
         }
@@ -47,8 +47,8 @@ fn main() {
         match instruction {
             Ok(decoded) => output.push(decoded),
             Err(e) => {
-                println!("Instruction decoding error at: 0x{:X}", bytes_read);
-                println!("Cause: {}", e);
+                eprintln!("Instruction decoding error at: 0x{:X}", bytes_read);
+                eprintln!("Cause: {}", e);
                 return;
             }
         }
@@ -56,7 +56,7 @@ fn main() {
         bytes_read += 2;
     }
 
-    for instruction in output {
-        println!("{:?}", instruction);
+    for (i, instruction) in output.iter().enumerate() {
+        println!("{}: {:?}", 512 + i * 2, instruction);
     }
 }

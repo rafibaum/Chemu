@@ -213,7 +213,7 @@ impl Machine {
         match instr {
             Instruction::Jmp { addr } => self.program_counter = addr as usize,
             Instruction::Call { addr } => {
-                let ret_addr = self.program_counter + OPCODE_SIZE;
+                let ret_addr = (self.program_counter + OPCODE_SIZE) as u16;
                 self.memory[self.stack_pointer..self.stack_pointer + ADDR_SIZE]
                     .copy_from_slice(&ret_addr.to_be_bytes());
                 self.stack_pointer += ADDR_SIZE;

@@ -1,5 +1,6 @@
 use crate::machine::Machine;
 use std::fs::File;
+use std::time::{Duration, Instant};
 
 mod display;
 mod instruction;
@@ -35,7 +36,14 @@ fn main() {
         }
     };
 
+
+    let timer_delta = Duration::from_secs_f64(1.0 / 60.0);
+    let mut tick_deadline = Instant::now();
     loop {
         machine.exec_next();
+        while tick_deadline.elapsed() >= timer_delta {
+            machine.decrement_timers();
+            tick_deadline += timer_delta;
+        }
     }
 }

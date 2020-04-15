@@ -238,6 +238,16 @@ impl Machine {
                 .unwrap(),
         )
     }
+
+    pub fn decrement_timers(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+
+        if self.sound_timer > 0 {
+            self.sound_timer -= 1;
+        }
+    }
 }
 
 /// Represents all the registers directly available to programs in the Chip-8 architecture. Each

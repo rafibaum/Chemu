@@ -36,7 +36,6 @@ fn main() {
         }
     };
 
-
     let timer_delta = Duration::from_secs_f64(1.0 / 60.0);
     let mut tick_deadline = Instant::now();
     loop {

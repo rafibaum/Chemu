@@ -190,6 +190,22 @@ impl Machine {
                     }
                 }
             },
+            Instruction::Ret => {}
+            Instruction::Jmp { addr: _ } => {}
+            Instruction::Call { addr: _ } => {}
+            Instruction::SeImm {
+                register: _,
+                value: _,
+            } => {}
+            Instruction::SneImm {
+                register: _,
+                value: _,
+            } => {}
+            Instruction::SeReg { reg1: _, reg2: _ } => {}
+            Instruction::SneReg { reg1: _, reg2: _ } => {}
+            Instruction::JmpOff { base_addr: _ } => {}
+            Instruction::Skp { keycode: _ } => {}
+            Instruction::SkpNeg { keycode: _ } => {}
             _ => unimplemented!(),
         }
 

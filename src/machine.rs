@@ -50,7 +50,7 @@ impl Machine {
     pub fn from_file(file: &mut File) -> Result<Machine, std::io::Error> {
         let sdl_context = sdl2::init().unwrap();
 
-        let mut memory = Vec::with_capacity(MEMORY_SIZE);
+        let mut memory = vec![0; MEMORY_SIZE];
 
         // Copy program data into memory
         if let Err(e) = file.read_exact(&mut memory[PROGRAM_START..]) {
@@ -60,7 +60,7 @@ impl Machine {
         };
 
         // Copy digit layouts into memory
-        memory.copy_from_slice(&DIGITS);
+        &memory[0..DIGITS.len()].copy_from_slice(&DIGITS);
 
         Ok(Machine {
             registers: vec![0; 16],
@@ -73,6 +73,13 @@ impl Machine {
             random: rand::thread_rng(),
             display: Display::new(sdl_context, 640, 320),
         })
+    }
+
+    pub fn exec_next(&mut self) {
+        let encoded = &self.memory[self.program_counter..self.program_counter + OPCODE_SIZE];
+        let instr =
+            crate::instruction::decode(u16::from_be_bytes(encoded.try_into().unwrap())).unwrap();
+        self.exec_instr(instr);
     }
 
     fn exec_instr(&mut self, instr: Instruction) {

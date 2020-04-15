@@ -26,7 +26,7 @@ fn main() {
         }
     };
 
-    let _machine = match Machine::from_file(&mut file) {
+    let mut machine = match Machine::from_file(&mut file) {
         Ok(machine) => machine,
         Err(e) => {
             eprintln!("Couldn't read file");
@@ -34,4 +34,8 @@ fn main() {
             return;
         }
     };
+
+    loop {
+        machine.exec_next();
+    }
 }

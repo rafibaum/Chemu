@@ -23,7 +23,10 @@ impl Display {
             .position_centered()
             .build()
             .unwrap();
-        let canvas = window.into_canvas().build().unwrap();
+        let mut canvas = window.into_canvas().build().unwrap();
+        canvas.set_draw_color(OFF_COLOUR);
+        canvas.clear();
+        canvas.present();
 
         Display {
             width,
@@ -39,6 +42,10 @@ impl Display {
                 *pixel = false;
             }
         }
+
+        self.canvas.set_draw_color(OFF_COLOUR);
+        self.canvas.clear();
+        self.canvas.present();
     }
 
     pub fn draw(&mut self, x: usize, y: usize, sprite: &[u8]) {
@@ -74,5 +81,6 @@ impl Display {
 
         self.canvas.set_draw_color(colour);
         self.canvas.draw_rect(rect).unwrap();
+        self.canvas.fill_rect(rect).unwrap();
     }
 }

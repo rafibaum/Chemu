@@ -1,10 +1,11 @@
+use crate::display::Display;
 use crate::instruction::Instruction;
 use rand::prelude::ThreadRng;
 use rand::Rng;
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::Formatter;
 use std::fs::File;
 use std::io::Read;
 
@@ -42,10 +43,13 @@ pub struct Machine {
     sound_timer: u8,
     memory: Vec<u8>,
     random: ThreadRng,
+    display: Display,
 }
 
 impl Machine {
     pub fn from_file(file: &mut File) -> Result<Machine, std::io::Error> {
+        let sdl_context = sdl2::init().unwrap();
+
         let mut memory = Vec::with_capacity(MEMORY_SIZE);
 
         // Copy program data into memory
@@ -67,6 +71,7 @@ impl Machine {
             sound_timer: 0,
             memory,
             random: rand::thread_rng(),
+            display: Display::new(sdl_context, 640, 320),
         })
     }
 
@@ -157,6 +162,14 @@ impl Machine {
                 for i in 0..*end as usize {
                     self.registers[i] = self.memory[self.address_register + i];
                 }
+            }
+            Instruction::Clr => self.display.clear(),
+            Instruction::Drw { x, y, length } => {
+                self.display.draw(
+                    self.registers[*x as usize] as usize,
+                    self.registers[*y as usize] as usize,
+                    &self.memory[self.address_register..self.address_register + *length as usize],
+                );
             }
             _ => unimplemented!(),
         }
@@ -251,7 +264,7 @@ pub struct RegisterParseError {
 
 impl Error for RegisterParseError {}
 
-impl Display for RegisterParseError {
+impl fmt::Display for RegisterParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "no register found for value: {:X}", self.value)
     }

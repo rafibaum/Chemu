@@ -1,6 +1,7 @@
 use crate::machine::Machine;
 use std::fs::File;
 
+mod display;
 mod instruction;
 mod machine;
 

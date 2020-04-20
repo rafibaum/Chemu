@@ -195,21 +195,15 @@ impl Machine {
                 self.registers[*register as usize] = key;
             },
             Instruction::Ret => {}
-            Instruction::Jmp { addr: _ } => {}
-            Instruction::Call { addr: _ } => {}
-            Instruction::SeImm {
-                register: _,
-                value: _,
-            } => {}
-            Instruction::SneImm {
-                register: _,
-                value: _,
-            } => {}
-            Instruction::SeReg { reg1: _, reg2: _ } => {}
-            Instruction::SneReg { reg1: _, reg2: _ } => {}
-            Instruction::JmpOff { base_addr: _ } => {}
-            Instruction::Skp { keycode: _ } => {}
-            Instruction::SkpNeg { keycode: _ } => {}
+            Instruction::Jmp { .. } => {}
+            Instruction::Call { .. } => {}
+            Instruction::SeImm { .. } => {}
+            Instruction::SneImm { .. } => {}
+            Instruction::SeReg { .. } => {}
+            Instruction::SneReg { .. } => {}
+            Instruction::JmpOff { .. } => {}
+            Instruction::Skp { .. } => {}
+            Instruction::SkpNeg { .. } => {}
             _ => unimplemented!(),
         }
 

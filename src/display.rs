@@ -48,13 +48,19 @@ impl Display {
         self.update_pending = true;
     }
 
-    pub fn draw(&mut self, x: usize, y: usize, sprite: &[u8]) {
+    pub fn draw(&mut self, x: usize, y: usize, sprite: &[u8]) -> bool {
+        let mut overwritten = false;
+
         for (i, &row) in sprite.iter().enumerate() {
             let mut mask: u8 = 0x80;
             for j in 0..8 {
                 let pixel = mask & row;
                 if pixel != 0 {
                     // Flip pixel
+                    if self.pixels[(y + i) % HEIGHT][(x + j) % WIDTH] {
+                        overwritten = true;
+                    }
+
                     self.pixels[(y + i) % HEIGHT][(x + j) % WIDTH] =
                         !self.pixels[(y + i) % HEIGHT][(x + j) % WIDTH];
                 }
@@ -63,6 +69,7 @@ impl Display {
         }
 
         self.update_pending = true;
+        overwritten
     }
 
     pub fn update(&mut self) {

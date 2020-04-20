@@ -178,11 +178,17 @@ impl Machine {
             }
             Instruction::Clr => self.display.clear(),
             Instruction::Drw { x, y, length } => {
-                self.display.draw(
+                let overwritten = self.display.draw(
                     self.registers[*x as usize] as usize,
                     self.registers[*y as usize] as usize,
                     &self.memory[self.address_register..self.address_register + *length as usize],
                 );
+
+                if overwritten {
+                    self.registers[Register::VF as usize] = 1;
+                } else {
+                    self.registers[Register::VF as usize] = 0;
+                }
             }
             Instruction::LdKey { register } => loop {
                 let Key(key) = self.keyboard.next_key();

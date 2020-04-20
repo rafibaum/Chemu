@@ -8,6 +8,10 @@ mod keyboard;
 mod machine;
 
 fn main() {
+    ctrlc::set_handler(move || {
+       std::process::exit(1);
+    }).unwrap();
+
     let mut args = std::env::args();
     args.next().unwrap(); // Skip first argument (executable name)
 

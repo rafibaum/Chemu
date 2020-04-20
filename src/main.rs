@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 mod display;
 mod instruction;
+mod keyboard;
 mod machine;
 
 fn main() {
@@ -36,13 +37,21 @@ fn main() {
         }
     };
 
+    let cpu_delta = Duration::from_secs_f64(1.0 / 100.0);
     let timer_delta = Duration::from_secs_f64(1.0 / 60.0);
     let mut tick_deadline = Instant::now();
     loop {
-        machine.exec_next();
         while tick_deadline.elapsed() >= timer_delta {
             machine.decrement_timers();
             tick_deadline += timer_delta;
         }
+
+        machine.process_key_events();
+
+        for _ in 0..5 {
+            machine.exec_next();
+        }
+
+        std::thread::sleep(cpu_delta);
     }
 }

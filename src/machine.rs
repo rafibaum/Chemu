@@ -1,10 +1,9 @@
 use crate::display::Display;
 use crate::instruction::Instruction;
+use crate::keyboard::{Key, Keyboard};
 use rand::prelude::ThreadRng;
 use rand::Rng;
-use sdl2::event::Event;
-use sdl2::keyboard::Scancode;
-use sdl2::EventPump;
+
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::fmt;
@@ -47,13 +46,14 @@ pub struct Machine {
     memory: Vec<u8>,
     random: ThreadRng,
     display: Display,
-    event_pump: EventPump,
+    keyboard: Keyboard,
 }
 
 impl Machine {
     pub fn from_file(file: &mut File) -> Result<Machine, std::io::Error> {
         let sdl_context = sdl2::init().unwrap();
         let event_pump = sdl_context.event_pump().unwrap();
+        let keyboard = Keyboard::new(event_pump);
 
         let mut memory = vec![0; MEMORY_SIZE];
 
@@ -77,7 +77,7 @@ impl Machine {
             memory,
             random: rand::thread_rng(),
             display: Display::new(sdl_context, 640, 320),
-            event_pump,
+            keyboard,
         })
     }
 
@@ -92,7 +92,10 @@ impl Machine {
         // Instructions that don't alter control-flow go here
         match &instr {
             Instruction::LdImm { register, value } => self.registers[*register as usize] = *value,
-            Instruction::AddImm { register, value } => self.registers[*register as usize] += *value,
+            Instruction::AddImm { register, value } => {
+                self.registers[*register as usize] =
+                    self.registers[*register as usize].wrapping_add(*value)
+            }
             Instruction::LdReg { dest, src } => {
                 self.registers[*dest as usize] = self.registers[*src as usize]
             }
@@ -182,13 +185,8 @@ impl Machine {
                 );
             }
             Instruction::LdKey { register } => loop {
-                if let Event::KeyDown { scancode, .. } = self.event_pump.wait_event() {
-                    let scancode = scancode.unwrap();
-                    if let Some(value) = from_scancode(scancode) {
-                        self.registers[*register as usize] = value;
-                        break;
-                    }
-                }
+                let Key(key) = self.keyboard.next_key();
+                self.registers[*register as usize] = key;
             },
             Instruction::Ret => {}
             Instruction::Jmp { addr: _ } => {}
@@ -256,11 +254,9 @@ impl Machine {
                     (base_addr + self.registers[Register::V0 as usize] as u16) as usize;
             }
             Instruction::Skp { keycode } => {
-                let scancode = to_scancode(self.registers[keycode as usize]);
                 if self
-                    .event_pump
-                    .keyboard_state()
-                    .is_scancode_pressed(scancode)
+                    .keyboard
+                    .is_pressed(Key(self.registers[keycode as usize]))
                 {
                     self.program_counter += OPCODE_SIZE * 2;
                 } else {
@@ -268,11 +264,9 @@ impl Machine {
                 }
             }
             Instruction::SkpNeg { keycode } => {
-                let scancode = to_scancode(self.registers[keycode as usize]);
                 if !self
-                    .event_pump
-                    .keyboard_state()
-                    .is_scancode_pressed(scancode)
+                    .keyboard
+                    .is_pressed(Key(self.registers[keycode as usize]))
                 {
                     self.program_counter += OPCODE_SIZE * 2;
                 } else {
@@ -300,50 +294,10 @@ impl Machine {
             self.sound_timer -= 1;
         }
     }
-}
 
-fn to_scancode(key: u8) -> Scancode {
-    match key {
-        0 => Scancode::Kp0,
-        1 => Scancode::Kp7,
-        2 => Scancode::W,
-        3 => Scancode::Kp9,
-        4 => Scancode::A,
-        5 => Scancode::Kp5,
-        6 => Scancode::D,
-        7 => Scancode::Kp1,
-        8 => Scancode::S,
-        9 => Scancode::Kp3,
-        0xA => Scancode::KpEquals,
-        0xB => Scancode::KpDivide,
-        0xC => Scancode::KpMultiply,
-        0xD => Scancode::KpMinus,
-        0xE => Scancode::KpPlus,
-        0xF => Scancode::KpEnter,
-        _ => unimplemented!(),
+    pub fn process_key_events(&mut self) {
+        self.keyboard.process_events();
     }
-}
-
-fn from_scancode(scancode: Scancode) -> Option<u8> {
-    Some(match scancode {
-        Scancode::Kp0 => 0,
-        Scancode::Kp7 => 1,
-        Scancode::W => 2,
-        Scancode::Kp9 => 3,
-        Scancode::A => 4,
-        Scancode::Kp5 => 5,
-        Scancode::D => 6,
-        Scancode::Kp1 => 7,
-        Scancode::S => 8,
-        Scancode::Kp3 => 9,
-        Scancode::KpEquals => 0xA,
-        Scancode::KpDivide => 0xB,
-        Scancode::KpMultiply => 0xC,
-        Scancode::KpMinus => 0xD,
-        Scancode::KpPlus => 0xE,
-        Scancode::KpEnter => 0xF,
-        _ => return None,
-    })
 }
 
 /// Represents all the registers directly available to programs in the Chip-8 architecture. Each

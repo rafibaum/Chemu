@@ -13,6 +13,7 @@ pub struct Display {
     height: u32,
     pixels: [[bool; WIDTH]; HEIGHT],
     canvas: WindowCanvas,
+    update_pending: bool,
 }
 
 impl Display {
@@ -33,6 +34,7 @@ impl Display {
             height,
             pixels: [[false; WIDTH]; HEIGHT],
             canvas,
+            update_pending: false,
         }
     }
 
@@ -43,9 +45,7 @@ impl Display {
             }
         }
 
-        self.canvas.set_draw_color(OFF_COLOUR);
-        self.canvas.clear();
-        self.canvas.present();
+        self.update_pending = true;
     }
 
     pub fn draw(&mut self, x: usize, y: usize, sprite: &[u8]) {
@@ -55,32 +55,42 @@ impl Display {
                 let pixel = mask & row;
                 if pixel != 0 {
                     // Flip pixel
-                    self.pixels[y + i][x + j] = !self.pixels[y + i][x + j];
-                    self.update_pixel(x + j, y + i);
+                    self.pixels[(y + i) % HEIGHT][(x + j) % WIDTH] =
+                        !self.pixels[(y + i) % HEIGHT][(x + j) % WIDTH];
                 }
                 mask >>= 1;
             }
         }
 
-        self.canvas.present();
+        self.update_pending = true;
     }
 
-    fn update_pixel(&mut self, x: usize, y: usize) {
+    pub fn update(&mut self) {
+        if !self.update_pending {
+            return;
+        }
+
         let height_scale = self.height / HEIGHT as u32;
         let width_scale = self.width / WIDTH as u32;
 
-        let x_scaled = x * width_scale as usize;
-        let y_scaled = y * height_scale as usize;
+        self.canvas.set_draw_color(OFF_COLOUR);
+        self.canvas.clear();
+        self.canvas.set_draw_color(ON_COLOUR);
 
-        let rect = Rect::new(x_scaled as i32, y_scaled as i32, width_scale, height_scale);
-        let colour = if self.pixels[y][x] {
-            ON_COLOUR
-        } else {
-            OFF_COLOUR
-        };
+        for (j, row) in self.pixels.iter().enumerate() {
+            let y_scaled = j * height_scale as usize;
+            for (i, pixel) in row.iter().enumerate() {
+                if *pixel {
+                    let x_scaled = i * width_scale as usize;
+                    let rect =
+                        Rect::new(x_scaled as i32, y_scaled as i32, width_scale, height_scale);
+                    self.canvas.draw_rect(rect).unwrap();
+                    self.canvas.fill_rect(rect).unwrap();
+                }
+            }
+        }
 
-        self.canvas.set_draw_color(colour);
-        self.canvas.draw_rect(rect).unwrap();
-        self.canvas.fill_rect(rect).unwrap();
+        self.canvas.present();
+        self.update_pending = false;
     }
 }

@@ -52,6 +52,7 @@ fn main() {
             machine.exec_next();
         }
 
+        machine.update_display();
         std::thread::sleep(cpu_delta);
     }
 }

@@ -298,6 +298,10 @@ impl Machine {
     pub fn process_key_events(&mut self) {
         self.keyboard.process_events();
     }
+
+    pub fn update_display(&mut self) {
+        self.display.update();
+    }
 }
 
 /// Represents all the registers directly available to programs in the Chip-8 architecture. Each

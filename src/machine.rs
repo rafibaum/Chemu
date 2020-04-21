@@ -163,16 +163,16 @@ impl Machine {
             Instruction::LdBcd { register } => {
                 let value = self.registers[*register as usize];
                 self.memory[self.address_register] = value / 100;
-                self.memory[self.address_register + 1] = (value % 100) / 10;
-                self.memory[self.address_register + 2] = value % 10;
+                self.memory[self.address_register + 1] = (value / 10) % 10;
+                self.memory[self.address_register + 2] = (value % 100) % 10;
             }
             Instruction::StrArray { end } => {
-                for i in 0..*end as usize {
+                for i in 0..=*end as usize {
                     self.memory[self.address_register + i] = self.registers[i];
                 }
             }
             Instruction::LdArray { end } => {
-                for i in 0..*end as usize {
+                for i in 0..=*end as usize {
                     self.registers[i] = self.memory[self.address_register + i];
                 }
             }
